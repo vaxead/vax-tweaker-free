@@ -1,0 +1,36 @@
+# Build results
+x64/
+Debug/
+Release/
+*.obj
+*.exe
+*.ilk
+*.pdb
+*.iobj
+*.ipdb
+*.log
+*.tlog
+*.lastbuildstate
+*.recipe
+*.manifest
+*.manifest.res
+*.res
+*.idb
+
+# Visual Studio
+.vs/
+*.vcxproj.user
+*.suo
+*.user
+*.sdf
+*.opensdf
+*.db
+*.opendb
+ipch/
+*.aps
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+~$*
