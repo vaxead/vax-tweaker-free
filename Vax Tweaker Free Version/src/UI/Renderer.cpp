@@ -102,7 +102,7 @@ void Renderer::DrawFooter() {
   PrintIndent();
   std::cout << "│" << Color::Reset;
   std::string footerContent = std::string(Color::Gray) +
-                              "  discord.gg/myYrWkn7" + Color::Reset +
+                              "  discord.gg/9Wu2EYPxrw"
                               "  " + std::string(Color::Dim) + "│" +
                               Color::Reset + std::string(Color::Gray) +
                               " github.com/vaxead/vax-tweaker-free" + Color::Reset;
