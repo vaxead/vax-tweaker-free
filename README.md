@@ -77,7 +77,7 @@ Looking for more modules and advanced tweaks? Check out the full version:
 
 ## Community
 
-- 💬 Discord: [discord.gg/myYrWkn7](https://discord.gg/9Wu2EYPxrw)
+- 💬 Discord: [https://discord.gg/9Wu2EYPxrw](https://discord.gg/9Wu2EYPxrw)
 - 🐛 Issues: [GitHub Issues](https://github.com/vaxead/vax-tweaker-free/issues)
 
 ## License
