@@ -2,7 +2,6 @@
 #include "Application.h"
 #include "../Modules/ModuleRegistry.h"
 #include "../Safety/SafetyGuard.h"
-#include "../System/DriftDetector.h"
 #include "../System/Logger.h"
 #include "../System/Registry.h"
 #include "../System/RestorePoint.h"
@@ -13,7 +12,6 @@
 #include "SystemProfile.h"
 #include "Types.h"
 #include <iostream>
-#include <thread>
 
 namespace Vax {
 
@@ -38,12 +36,7 @@ int Application::Run() {
 
   HandleRestorePoint();
 
-  std::thread([this]() { RunDriftCheck(); }).detach();
-
   MainLoop();
-
-  System::DriftDetector::SaveSnapshot(
-      Modules::ModuleRegistry::Instance().GetAll());
 
   ShowExitScreen();
   return 0;
@@ -61,23 +54,6 @@ void Application::Initialize() {
 
 void Application::InitializeModules() {
   Modules::ModuleRegistry::Instance().InitializeDefaults();
-}
-
-void Application::RunDriftCheck() {
-  auto &registry = Modules::ModuleRegistry::Instance();
-  for (const auto &mod : registry.GetAll()) {
-    if (mod && mod->IsImplemented()) {
-      mod->RefreshStatus();
-    }
-  }
-
-  auto drifted = System::DriftDetector::DetectDrift(registry.GetAll());
-
-  {
-    std::lock_guard<std::mutex> lock(m_driftMutex);
-    m_driftResults = std::move(drifted);
-  }
-  m_driftCheckDone.store(true);
 }
 
 bool Application::ShowDisclaimer() {
@@ -169,16 +145,6 @@ bool Application::HandleRestorePoint() {
 
 void Application::MainLoop() {
   while (m_state.isRunning) {
-    if (m_driftCheckDone.exchange(false)) {
-      std::lock_guard<std::mutex> lock(m_driftMutex);
-      if (!m_driftResults.empty()) {
-        UI::Console::Clear();
-        UI::Renderer::DrawDriftWarning(m_driftResults);
-        UI::Console::WaitForKey();
-        m_driftResults.clear();
-      }
-    }
-
     ShowMainScreen();
 
     std::string input = UI::Console::ReadLine();

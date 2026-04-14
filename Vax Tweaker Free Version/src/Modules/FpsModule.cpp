@@ -640,8 +640,8 @@ void FpsModule::InitializeTweaks() {
     t1.subKey = "SYSTEM\\CurrentControlSet\\Services\\mouclass\\Parameters";
     t1.valueName = "MouseDataQueueSize";
     t1.valueType = RegValueType::Dword;
-    t1.applyDword = 16;
-    t1.expectedDword = 16;
+    t1.applyDword = 0x50;
+    t1.expectedDword = 0x50;
     t1.defaultDword = 100;
 
     RegistryTarget t2;
@@ -649,15 +649,14 @@ void FpsModule::InitializeTweaks() {
     t2.subKey = "SYSTEM\\CurrentControlSet\\Services\\kbdclass\\Parameters";
     t2.valueName = "KeyboardDataQueueSize";
     t2.valueType = RegValueType::Dword;
-    t2.applyDword = 16;
-    t2.expectedDword = 16;
+    t2.applyDword = 0x50;
+    t2.expectedDword = 0x50;
     t2.defaultDword = 100;
 
     RegisterTweak(
         {"fps_input_queue",
          "Optimize Input Queue Size",
-         "Reduces mouse/keyboard buffer size from 100 to 16 for lower input "
-         "latency",
+         "Optimizes mouse and keyboard data queue for smoother input handling",
          RiskLevel::Safe,
          TweakStatus::Unknown,
          false,
@@ -754,9 +753,9 @@ void FpsModule::InitializeTweaks() {
                 "Management";
     t2.valueName = "LargeSystemCache";
     t2.valueType = RegValueType::Dword;
-    t2.applyDword = 1;
-    t2.expectedDword = 1;
-    t2.defaultDword = 0;
+    t2.applyDword = 0;
+    t2.expectedDword = 0;
+    t2.deleteOnRevert = true;
 
     RegisterTweak(
         {"fps_large_system_cache",
@@ -843,6 +842,233 @@ void FpsModule::InitializeTweaks() {
                    RiskLevel::Moderate, TweakStatus::Unknown, true});
   }
 
+  // Force DWM Effect Mode
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_CURRENT_USER;
+    t1.subKey = "Software\\Microsoft\\Windows\\DWM";
+    t1.valueName = "Composition";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 0;
+    t1.expectedDword = 0;
+    t1.defaultDword = 1;
+
+    RegisterTweak(
+        {"fps_dwm_vsync",
+         "Force DWM Effect Mode",
+         "Reduces DWM compositor overhead for lower display latency",
+         RiskLevel::Advanced,
+         TweakStatus::Unknown,
+         false,
+         {t1}});
+  }
+
+  // Disable GPU Preemption
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers\\Scheduler";
+    t1.valueName = "EnablePreemption";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 0;
+    t1.expectedDword = 0;
+    t1.deleteOnRevert = true;
+
+    RegisterTweak(
+        {"fps_gpu_preemption",
+         "Disable GPU Preemption",
+         "Prevents the OS from pre-empting GPU work, reducing stutter on "
+         "dedicated gaming systems",
+         RiskLevel::Advanced,
+         TweakStatus::Unknown,
+         true,
+         {t1}});
+  }
+
+  // CSRSS Priority Boost
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File "
+                "Execution Options\\csrss.exe\\PerfOptions";
+    t1.valueName = "CpuPriorityClass";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 4;
+    t1.expectedDword = 4;
+    t1.deleteOnRevert = true;
+
+    RegistryTarget t2;
+    t2.root = HKEY_LOCAL_MACHINE;
+    t2.subKey = "SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File "
+                "Execution Options\\csrss.exe\\PerfOptions";
+    t2.valueName = "IoPriority";
+    t2.valueType = RegValueType::Dword;
+    t2.applyDword = 3;
+    t2.expectedDword = 3;
+    t2.deleteOnRevert = true;
+
+    RegisterTweak({"fps_csrss_priority",
+                   "Boost CSRSS Priority",
+                   "Elevates CSRSS (Client Server Runtime) CPU and IO priority "
+                   "for smoother input handling",
+                   RiskLevel::Advanced,
+                   TweakStatus::Unknown,
+                   true,
+                   {t1, t2}});
+  }
+
+  // Disable WHEA Error Recovery
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SYSTEM\\CurrentControlSet\\Control\\WHEA\\Policy";
+    t1.valueName = "DisableOffline";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 1;
+    t1.expectedDword = 1;
+    t1.deleteOnRevert = true;
+
+    RegisterTweak({"fps_whea",
+                   "Disable WHEA Error Recovery",
+                   "Disables Windows Hardware Error Architecture auto-recovery "
+                   "to reduce DPC overhead",
+                   RiskLevel::Advanced,
+                   TweakStatus::Unknown,
+                   false,
+                   {t1}});
+  }
+
+  // Force DXGI Flip Model
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SOFTWARE\\Microsoft\\DirectX";
+    t1.valueName = "ForceFlipPresentModel";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 1;
+    t1.expectedDword = 1;
+    t1.deleteOnRevert = true;
+
+    RegistryTarget t2;
+    t2.root = HKEY_CURRENT_USER;
+    t2.subKey = "Software\\Microsoft\\DirectX\\UserGpuPreferences";
+    t2.valueName = "DirectXUserGlobalSettings";
+    t2.valueType = RegValueType::String;
+    t2.applyString = "SwapEffectUpgradeEnable=1";
+    t2.expectedString = "SwapEffectUpgradeEnable=1";
+    t2.mergeStringValue = true;
+
+    RegistryTarget t3;
+    t3.root = HKEY_LOCAL_MACHINE;
+    t3.subKey = "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers";
+    t3.valueName = "TdrDelay";
+    t3.valueType = RegValueType::Dword;
+    t3.applyDword = 60;
+    t3.expectedDword = 60;
+    t3.deleteOnRevert = true;
+
+    RegisterTweak({"fps_dxgi_flip_model",
+                   "Force DXGI Flip Model",
+                   "Forces all DirectX apps to use Flip presentation model "
+                   "and extends TDR timeout to prevent GPU resets under load",
+                   RiskLevel::Moderate,
+                   TweakStatus::Unknown,
+                   false,
+                   {t1, t2, t3}});
+  }
+
+  // DWM Advanced Performance
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_CURRENT_USER;
+    t1.subKey = "Software\\Microsoft\\Windows\\DWM";
+    t1.valueName = "MaxQueuedBuffers";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 2;
+    t1.expectedDword = 2;
+    t1.deleteOnRevert = true;
+
+    RegistryTarget t2;
+    t2.root = HKEY_CURRENT_USER;
+    t2.subKey = "Software\\Microsoft\\Windows\\DWM";
+    t2.valueName = "UseMachineCheck";
+    t2.valueType = RegValueType::Dword;
+    t2.applyDword = 0;
+    t2.expectedDword = 0;
+    t2.deleteOnRevert = true;
+
+    RegisterTweak({"fps_dwm_advanced",
+                   "DWM Advanced Performance",
+                   "Reduces DWM queued buffers for lower compositor latency "
+                   "and disables machine check overlay",
+                   RiskLevel::Moderate,
+                   TweakStatus::Unknown,
+                   false,
+                   {t1, t2}});
+  }
+
+  // GPU Power Management
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers\\Power";
+    t1.valueName = "DefaultD3TransitionLatencyActivelyUsed";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 1;
+    t1.expectedDword = 1;
+    t1.deleteOnRevert = true;
+
+    RegistryTarget t2;
+    t2.root = HKEY_LOCAL_MACHINE;
+    t2.subKey = "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers\\Power";
+    t2.valueName = "DefaultD3TransitionLatencyIdleLongTime";
+    t2.valueType = RegValueType::Dword;
+    t2.applyDword = 1;
+    t2.expectedDword = 1;
+    t2.deleteOnRevert = true;
+
+    RegistryTarget t3;
+    t3.root = HKEY_LOCAL_MACHINE;
+    t3.subKey = "SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers\\Power";
+    t3.valueName = "DefaultD3TransitionLatencyIdleMonitorOff";
+    t3.valueType = RegValueType::Dword;
+    t3.applyDword = 1;
+    t3.expectedDword = 1;
+    t3.deleteOnRevert = true;
+
+    RegisterTweak({"fps_gpu_power_mgmt",
+                   "Disable GPU Power Save",
+                   "Removes GPU D3 transition latency delays for consistent "
+                   "frame delivery",
+                   RiskLevel::Advanced,
+                   TweakStatus::Unknown,
+                   false,
+                   {t1, t2, t3}});
+  }
+
+  // Disable Connected Standby
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SYSTEM\\CurrentControlSet\\Control\\Power";
+    t1.valueName = "CsEnabled";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 0;
+    t1.expectedDword = 0;
+    t1.defaultDword = 1;
+
+    RegisterTweak({"fps_connected_standby",
+                   "Disable Connected Standby",
+                   "Disables Modern Standby / Connected Standby to prevent "
+                   "background wake-ups that cause micro-stutter",
+                   RiskLevel::Advanced,
+                   TweakStatus::Unknown,
+                   true,
+                   {t1}});
+  }
+
+  // GROUPS
+
   RegisterGroup(
       {"fps_display",
        "Display & Compositor",
@@ -881,10 +1107,20 @@ void FpsModule::InitializeTweaks() {
        "\xf0\x9f\x92\xa1",
        "Power Throttling, Background Apps, Startup Delay, "
        "Keep Kernel in RAM, Auto-End Tasks, PCIe ASPM, "
-       "Fast Startup, Timers",
+       "Fast Startup, Timers, Connected Standby",
        {"fps_power_throttle", "fps_background_apps", "fps_startup_delay",
         "fps_large_system_cache", "fps_auto_end_tasks", "fps_aspm",
-        "fps_fast_startup", "fps_distribute_timers"}});
+        "fps_fast_startup", "fps_distribute_timers", "fps_connected_standby"}});
+
+  RegisterGroup(
+      {"fps_advanced",
+       "Advanced Tuning",
+       "\xf0\x9f\x94\xac",
+       "CSRSS Priority, GPU Preemption, GPU Power Save, DWM Effect Mode, "
+       "DXGI Flip Model, DWM Advanced, WHEA Recovery",
+       {"fps_csrss_priority", "fps_gpu_preemption", "fps_gpu_power_mgmt",
+        "fps_dwm_vsync", "fps_dxgi_flip_model", "fps_dwm_advanced",
+        "fps_whea"}});
 
   RegisterGroup({"fps_services",
                  "Services & Maintenance",

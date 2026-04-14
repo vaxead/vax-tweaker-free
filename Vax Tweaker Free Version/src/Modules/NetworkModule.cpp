@@ -5,10 +5,114 @@
 #include "../System/ProcessUtils.h"
 #include "../System/Registry.h"
 #include <algorithm>
+#include <initializer_list>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <windows.h>
+
+static std::string EscapePowerShellSingleQuoted(const std::string &value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (char ch : value) {
+    if (ch == '\'')
+      escaped += "''";
+    else
+      escaped += ch;
+  }
+  return escaped;
+}
+
+namespace {
+
+struct NicPropertyExpectation {
+  const char *name;
+  const char *expectedValue;
+  bool required = true;
+};
+
+bool NicPropertyEquals(const std::string &nicKey, const char *property,
+                       const char *expectedValue) {
+  if (nicKey.empty())
+    return false;
+
+  auto currentValue = Vax::System::Registry::ReadString(HKEY_LOCAL_MACHINE,
+                                                        nicKey, property);
+  return currentValue.has_value() && currentValue.value() == expectedValue;
+}
+
+bool NicPropertyExists(const std::string &nicKey, const char *property) {
+  if (nicKey.empty())
+    return false;
+
+  return Vax::System::Registry::ReadString(HKEY_LOCAL_MACHINE, nicKey, property)
+      .has_value();
+}
+
+Vax::TweakStatus EvaluateNicPropertyGroupStatus(
+    const std::string &nicKey,
+    std::initializer_list<NicPropertyExpectation> expectations) {
+  if (nicKey.empty())
+    return Vax::TweakStatus::NotApplied;
+
+  int requiredTotal = 0;
+  int requiredMatched = 0;
+  bool anyMatched = false;
+
+  for (const auto &expectation : expectations) {
+    if (expectation.required)
+      ++requiredTotal;
+
+    auto currentValue = Vax::System::Registry::ReadString(
+        HKEY_LOCAL_MACHINE, nicKey, expectation.name);
+    if (!currentValue.has_value())
+      continue;
+
+    if (currentValue.value() != expectation.expectedValue)
+      continue;
+
+    anyMatched = true;
+    if (expectation.required)
+      ++requiredMatched;
+  }
+
+  if (requiredTotal > 0 && requiredMatched == requiredTotal)
+    return Vax::TweakStatus::Applied;
+  if (anyMatched)
+    return Vax::TweakStatus::Partial;
+  return Vax::TweakStatus::NotApplied;
+}
+
+Vax::TweakStatus EvaluateExistingNicPropertyGroupStatus(
+    const std::string &nicKey,
+    std::initializer_list<NicPropertyExpectation> expectations) {
+  if (nicKey.empty())
+    return Vax::TweakStatus::NotApplied;
+
+  int existingCount = 0;
+  int matchedCount = 0;
+
+  for (const auto &expectation : expectations) {
+    auto currentValue = Vax::System::Registry::ReadString(
+        HKEY_LOCAL_MACHINE, nicKey, expectation.name);
+    if (!currentValue.has_value())
+      continue;
+
+    ++existingCount;
+    if (currentValue.value() == expectation.expectedValue)
+      ++matchedCount;
+  }
+
+  if (existingCount == 0)
+    return Vax::TweakStatus::NotApplied;
+  if (matchedCount == existingCount)
+    return Vax::TweakStatus::Applied;
+  if (matchedCount > 0)
+    return Vax::TweakStatus::Partial;
+  return Vax::TweakStatus::NotApplied;
+}
+
+} // namespace
 
 namespace Vax::Modules {
 
@@ -34,13 +138,16 @@ void NetworkModule::InitializeTweaks() {
                  "🔌",
                  "Low-level adapter settings for latency reduction",
                  {"net_nic_intmod", "net_nic_flow", "net_nic_eee",
-                  "net_nic_rsc", "net_nic_lso"}});
+                  "net_nic_rsc", "net_nic_lso", "net_nic_checksum",
+                  "net_nic_wol", "net_nic_arp_offload", "net_nic_vlan",
+                  "net_nic_power"}});
 
   RegisterGroup({"group_tcp",
                  "TCP/IP Stack",
                  "📡",
                  "System-wide protocol optimizations",
-                 {"net_nagle", "net_tcp_system"}});
+                 {"net_nagle", "net_tcp_system", "net_tcp_ecn",
+                  "net_qos_limit"}});
 
   RegisterGroup({"group_dns",
                  "DNS & Protocols",
@@ -83,6 +190,41 @@ void NetworkModule::InitializeTweaks() {
                  "on some adapters.",
                  RiskLevel::Moderate, TweakStatus::Unknown, false});
 
+  // Checksum Offload
+  RegisterTweak(
+      {"net_nic_checksum", "Disable Checksum Offload",
+       "Disables TCP/UDP/IPv4 checksum offload so the CPU handles verification "
+       "immediately, reducing NIC-induced latency.",
+       RiskLevel::Moderate, TweakStatus::Unknown, false});
+
+  // Wake on LAN
+  RegisterTweak(
+      {"net_nic_wol", "Disable Wake on LAN",
+       "Disables Wake on Magic Packet, Pattern Match, and WoL to prevent "
+       "the NIC from listening for wake frames (reduces power draw).",
+       RiskLevel::Safe, TweakStatus::Unknown, false});
+
+  // ARP/NS Offload
+  RegisterTweak(
+      {"net_nic_arp_offload", "Disable ARP/NS Offload",
+       "Disables ARP and Neighbor Solicitation offload so the CPU handles "
+       "ARP responses directly, reducing NIC wake-up latency.",
+       RiskLevel::Safe, TweakStatus::Unknown, false});
+
+  // Priority & VLAN
+  RegisterTweak(
+      {"net_nic_vlan", "Disable Priority & VLAN",
+       "Disables 802.1p QoS priority tagging and VLAN filtering on the NIC "
+       "to reduce per-packet processing overhead.",
+       RiskLevel::Safe, TweakStatus::Unknown, false});
+
+  // NIC Power Saving
+  RegisterTweak(
+      {"net_nic_power", "Disable NIC Power Saving",
+       "Prevents the network adapter from entering power-saving mode which "
+       "causes latency spikes when waking up.",
+       RiskLevel::Safe, TweakStatus::Unknown, false});
+
   RegisterTweak({"net_nagle", "Disable Nagle Algorithm",
                  "Disables Nagle's algorithm (TCPNoDelay) to send packets "
                  "immediately without waiting for buffer fill.",
@@ -92,6 +234,33 @@ void NetworkModule::InitializeTweaks() {
                  "Optimizes MaxUserPort (65534), TcpTimedWaitDelay (30s), and "
                  "disables TCP Heuristics.",
                  RiskLevel::Safe, TweakStatus::Unknown, false});
+
+  // Disable TCP ECN
+  RegisterTweak({"net_tcp_ecn", "Disable ECN Capability",
+                 "Explicit Congestion Notification (ECN) adds overhead to TCP "
+                 "packets and causes issues with some game servers.",
+                 RiskLevel::Safe, TweakStatus::Unknown, false});
+
+  // Remove QoS Bandwidth Limit
+  {
+    RegistryTarget t1;
+    t1.root = HKEY_LOCAL_MACHINE;
+    t1.subKey = "SOFTWARE\\Policies\\Microsoft\\Windows\\Psched";
+    t1.valueName = "NonBestEffortLimit";
+    t1.valueType = RegValueType::Dword;
+    t1.applyDword = 0;
+    t1.expectedDword = 0;
+    t1.deleteOnRevert = true;
+
+    RegisterTweak({"net_qos_limit",
+                   "Remove QoS Bandwidth Limit",
+                   "Removes the 20% bandwidth reservation for QoS (Packet "
+                   "Scheduler)",
+                   RiskLevel::Safe,
+                   TweakStatus::Unknown,
+                   true,
+                   {t1}});
+  }
 
   RegisterTweak({"net_netbios", "Disable NetBIOS",
                  "Reduces local broadcast traffic/noise on the network.",
@@ -141,11 +310,42 @@ bool NetworkModule::ApplyTweak(const std::string &tweakId) {
   if (tweakId == "net_nic_lso")
     return ApplyNicProperty("*LsoV2IPv4", "0") &&
            ApplyNicProperty("*LsoV2IPv6", "0");
+  if (tweakId == "net_nic_checksum")
+    return ApplyNicProperty("*TCPChecksumOffloadIPv4", "0") &&
+           ApplyNicProperty("*TCPChecksumOffloadIPv6", "0") &&
+           ApplyNicProperty("*UDPChecksumOffloadIPv4", "0") &&
+           ApplyNicProperty("*UDPChecksumOffloadIPv6", "0") &&
+           ApplyNicProperty("*IPChecksumOffloadIPv4", "0");
+  if (tweakId == "net_nic_wol") {
+    bool ok = true;
+    ok &= ApplyNicProperty("*WakeOnMagicPacket", "0");
+    ok &= ApplyNicProperty("*WakeOnPattern", "0");
+    ApplyNicProperty("WakeOnLink", "0");
+    ApplyNicProperty("ShutdownWakeOnLan", "0");
+    return ok;
+  }
+  if (tweakId == "net_nic_arp_offload")
+    return ApplyNicProperty("*PMARPOffload", "0") &&
+           ApplyNicProperty("*PMNSOffload", "0");
+  if (tweakId == "net_nic_vlan")
+    return ApplyNicProperty("*PriorityVLANTag", "0");
+  if (tweakId == "net_nic_power") {
+    bool ok1 = ApplyNicProperty("*NicAutoPowerSaver", "0");
+    bool ok2 = ApplyNicProperty("EnablePME", "0");
+    bool ok3 = ApplyNicProperty("ReduceSpeedOnPowerDown", "0");
+    if (ok1 || ok2 || ok3)
+      Vax::System::Logger::Success("Applied NIC Power Saving optimizations");
+    else
+      Vax::System::Logger::Warning("NIC does not support power saving properties");
+    return ok1 || ok2 || ok3;
+  }
 
   if (tweakId == "net_nagle")
     return ApplyNagle();
   if (tweakId == "net_tcp_system")
     return ApplyTcpSystemSettings();
+  if (tweakId == "net_tcp_ecn")
+    return ApplyTcpEcn();
 
   if (tweakId == "net_netbios")
     return ApplyNetBios();
@@ -190,11 +390,40 @@ bool NetworkModule::RevertTweak(const std::string &tweakId) {
   if (tweakId == "net_nic_lso")
     return ApplyNicProperty("*LsoV2IPv4", "1") &&
            ApplyNicProperty("*LsoV2IPv6", "1");
+  if (tweakId == "net_nic_checksum")
+    return ApplyNicProperty("*TCPChecksumOffloadIPv4", "3") &&
+           ApplyNicProperty("*TCPChecksumOffloadIPv6", "3") &&
+           ApplyNicProperty("*UDPChecksumOffloadIPv4", "3") &&
+           ApplyNicProperty("*UDPChecksumOffloadIPv6", "3") &&
+           ApplyNicProperty("*IPChecksumOffloadIPv4", "3");
+  if (tweakId == "net_nic_wol") {
+    bool ok = true;
+    ok &= ApplyNicProperty("*WakeOnMagicPacket", "1");
+    ok &= ApplyNicProperty("*WakeOnPattern", "1");
+    ApplyNicProperty("WakeOnLink", "1");
+    ApplyNicProperty("ShutdownWakeOnLan", "1");
+    return ok;
+  }
+  if (tweakId == "net_nic_arp_offload")
+    return ApplyNicProperty("*PMARPOffload", "1") &&
+           ApplyNicProperty("*PMNSOffload", "1");
+  if (tweakId == "net_nic_vlan")
+    return ApplyNicProperty("*PriorityVLANTag", "3");
+  if (tweakId == "net_nic_power") {
+    bool ok1 = ApplyNicProperty("*NicAutoPowerSaver", "1");
+    bool ok2 = ApplyNicProperty("EnablePME", "1");
+    bool ok3 = ApplyNicProperty("ReduceSpeedOnPowerDown", "1");
+    if (ok1 || ok2 || ok3)
+      Vax::System::Logger::Success("Reverted NIC Power Saving properties");
+    return ok1 || ok2 || ok3;
+  }
 
   if (tweakId == "net_nagle")
     return RevertNagle();
   if (tweakId == "net_tcp_system")
     return RevertTcpSystemSettings();
+  if (tweakId == "net_tcp_ecn")
+    return RevertTcpEcn();
 
   if (tweakId == "net_netbios")
     return RevertNetBios();
@@ -213,14 +442,76 @@ void NetworkModule::RefreshStatus() {
       t->status = condition ? TweakStatus::Applied : TweakStatus::NotApplied;
   };
 
-  Update("net_nic_intmod", IsNicPropertySet("*InterruptModeration", "0"));
-  Update("net_nic_flow", IsNicPropertySet("*FlowControl", "0"));
-  Update("net_nic_eee", IsNicPropertySet("*EEE", "0"));
-  Update("net_nic_rsc", IsNicPropertySet("*RscIPv4", "0"));
-  Update("net_nic_lso", IsNicPropertySet("*LsoV2IPv4", "0"));
+  auto UpdateStatus = [&](const char *id, TweakStatus status) {
+    TweakInfo *t = FindTweak(id);
+    if (t)
+      t->status = status;
+  };
+
+  const std::string nicKey = FindActiveAdapterRegistryKey();
+
+  UpdateStatus("net_nic_intmod",
+               NicPropertyEquals(nicKey, "*InterruptModeration", "0")
+                   ? TweakStatus::Applied
+                   : TweakStatus::NotApplied);
+  UpdateStatus("net_nic_flow",
+               NicPropertyEquals(nicKey, "*FlowControl", "0")
+                   ? TweakStatus::Applied
+                   : TweakStatus::NotApplied);
+  UpdateStatus("net_nic_eee",
+               NicPropertyEquals(nicKey, "*EEE", "0")
+                   ? TweakStatus::Applied
+                   : TweakStatus::NotApplied);
+  UpdateStatus("net_nic_rsc",
+               EvaluateNicPropertyGroupStatus(
+                   nicKey,
+                   {{"*RscIPv4", "0"}, {"*RscIPv6", "0"}}));
+  UpdateStatus("net_nic_lso",
+               EvaluateNicPropertyGroupStatus(
+                   nicKey,
+                   {{"*LsoV2IPv4", "0"}, {"*LsoV2IPv6", "0"}}));
+  UpdateStatus(
+      "net_nic_checksum",
+      EvaluateNicPropertyGroupStatus(
+          nicKey,
+          {{"*TCPChecksumOffloadIPv4", "0"},
+           {"*TCPChecksumOffloadIPv6", "0"},
+           {"*UDPChecksumOffloadIPv4", "0"},
+           {"*UDPChecksumOffloadIPv6", "0"},
+           {"*IPChecksumOffloadIPv4", "0"}}));
+  UpdateStatus(
+      "net_nic_wol",
+      EvaluateNicPropertyGroupStatus(
+          nicKey,
+          {{"*WakeOnMagicPacket", "0"},
+           {"*WakeOnPattern", "0"},
+           {"WakeOnLink", "0", false},
+           {"ShutdownWakeOnLan", "0", false}}));
+  UpdateStatus("net_nic_arp_offload",
+               EvaluateNicPropertyGroupStatus(
+                   nicKey,
+                   {{"*PMARPOffload", "0"}, {"*PMNSOffload", "0"}}));
+  UpdateStatus("net_nic_vlan",
+               NicPropertyEquals(nicKey, "*PriorityVLANTag", "0")
+                   ? TweakStatus::Applied
+                   : TweakStatus::NotApplied);
+  if (NicPropertyExists(nicKey, "*NicAutoPowerSaver") ||
+      NicPropertyExists(nicKey, "EnablePME") ||
+      NicPropertyExists(nicKey, "ReduceSpeedOnPowerDown")) {
+    UpdateStatus(
+        "net_nic_power",
+        EvaluateExistingNicPropertyGroupStatus(
+            nicKey,
+            {{"*NicAutoPowerSaver", "0"},
+             {"EnablePME", "0"},
+             {"ReduceSpeedOnPowerDown", "0"}}));
+  } else {
+    UpdateStatus("net_nic_power", TweakStatus::NotApplied);
+  }
 
   Update("net_nagle", IsNagleDisabled());
   Update("net_tcp_system", IsTcpSystemOptimized());
+  Update("net_tcp_ecn", IsTcpEcnDisabled());
 
   Update("net_netbios", IsNetBiosDisabled());
   Update("net_dns_cloudflare", IsDnsServerSet("1.1.1.1"));
@@ -248,12 +539,23 @@ std::string NetworkModule::FindActiveAdapterRegistryKey() {
 
 bool NetworkModule::ApplyNicProperty(const std::string &property,
                                      const std::string &value) {
+  const std::string escapedProperty =
+      EscapePowerShellSingleQuoted(property);
+  const std::string escapedValue = EscapePowerShellSingleQuoted(value);
+
   std::string cmd =
       "powershell -NoProfile -Command \""
       "$ok=$false; Get-NetAdapter -Physical | ForEach-Object { "
-      "try { Set-NetAdapterAdvancedProperty -Name $_.Name -RegistryKeyword '" +
-      property + "' -RegistryValue '" + value +
-      "' -ErrorAction Stop; $ok=$true } catch {} "
+      "try { "
+      "$prop = Get-NetAdapterAdvancedProperty -Name $_.Name -AllProperties "
+      "-ErrorAction Stop | Where-Object { $_.RegistryKeyword -eq '" +
+      escapedProperty +
+      "' } | Select-Object -First 1; "
+      "if($null -ne $prop) { "
+      "Set-NetAdapterAdvancedProperty -InputObject $prop -RegistryValue '" +
+      escapedValue +
+      "' -ErrorAction Stop; $ok=$true } "
+      "} catch {} "
       "}; if(-not $ok){exit 1}\"";
   bool ok = Vax::System::RunSilentCommand(cmd);
   if (ok)
@@ -264,17 +566,27 @@ bool NetworkModule::ApplyNicProperty(const std::string &property,
   return ok;
 }
 
-bool NetworkModule::RevertNicProperty(const std::string &property) {
+bool NetworkModule::RevertNicProperty(const std::string &property, bool quiet) {
+  const std::string escapedProperty =
+      EscapePowerShellSingleQuoted(property);
   std::string cmd = "powershell -NoProfile -Command \""
                     "$ok=$false; Get-NetAdapter -Physical | ForEach-Object { "
-                    "try { Reset-NetAdapterAdvancedProperty -Name $_.Name "
-                    "-RegistryKeyword '" +
-                    property +
-                    "' -ErrorAction Stop; $ok=$true } catch {} "
+                    "try { "
+                    "$prop = Get-NetAdapterAdvancedProperty -Name $_.Name "
+                    "-AllProperties -ErrorAction Stop | Where-Object { "
+                    "$_.RegistryKeyword -eq '" +
+                    escapedProperty +
+                    "' } | Select-Object -First 1; "
+                    "if($null -ne $prop) { "
+                    "Reset-NetAdapterAdvancedProperty -InputObject $prop "
+                    "-ErrorAction Stop; $ok=$true } "
+                    "} catch {} "
                     "}; if(-not $ok){exit 1}\"";
   bool ok = Vax::System::RunSilentCommand(cmd);
   if (ok)
     Vax::System::Logger::Success("Reverted NIC Property: " + property);
+  else if (!quiet)
+    Vax::System::Logger::Warning("Failed to revert NIC Property: " + property);
   return ok;
 }
 
@@ -547,6 +859,36 @@ bool NetworkModule::FlushDns() {
   if (ok)
     Vax::System::Logger::Success("Flushed DNS Cache");
   return ok;
+}
+
+bool NetworkModule::ApplyTcpEcn() {
+  bool ok = Vax::System::RunSilentCommand(
+      "netsh int tcp set global ecncapability=disabled");
+  if (ok)
+    Vax::System::Logger::Success("Disabled ECN Capability");
+  return ok;
+}
+
+bool NetworkModule::RevertTcpEcn() {
+  bool ok = Vax::System::RunSilentCommand(
+      "netsh int tcp set global ecncapability=default");
+  if (ok)
+    Vax::System::Logger::Success("Reverted ECN to default");
+  return ok;
+}
+
+bool NetworkModule::IsTcpEcnDisabled() {
+  std::string out =
+      Vax::System::RunCommandCapture("netsh int tcp show global");
+  // Match "ECN Capability" line — expected "disabled"
+  std::string lower = out;
+  std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+  auto pos = lower.find("ecn capability");
+  if (pos == std::string::npos)
+    return false;
+  auto lineEnd = lower.find('\n', pos);
+  std::string line = lower.substr(pos, lineEnd - pos);
+  return line.find("disabled") != std::string::npos;
 }
 
 }

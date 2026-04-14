@@ -12,8 +12,8 @@ Release/
 *.tlog
 *.lastbuildstate
 *.recipe
-*.manifest
-*.manifest.res
+*.embed.manifest
+*.embed.manifest.res
 *.res
 *.idb
 

@@ -97,7 +97,9 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -127,7 +129,9 @@
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -142,7 +146,7 @@
     <ClCompile Include="src\Modules\ModuleRegistry.cpp" />
     <ClCompile Include="src\Modules\NetworkModule.cpp" />
     <ClCompile Include="src\Safety\SafetyGuard.cpp" />
-    <ClCompile Include="src\System\DriftDetector.cpp" />
+
     <ClCompile Include="src\System\Logger.cpp" />
     <ClCompile Include="src\System\PowerPlanManager.cpp" />
     <ClCompile Include="src\System\ProcessUtils.cpp" />
@@ -164,7 +168,7 @@
     <ClInclude Include="src\Modules\ModuleRegistry.h" />
     <ClInclude Include="src\Modules\NetworkModule.h" />
     <ClInclude Include="src\Safety\SafetyGuard.h" />
-    <ClInclude Include="src\System\DriftDetector.h" />
+
     <ClInclude Include="src\System\Logger.h" />
     <ClInclude Include="src\System\PowerPlanManager.h" />
     <ClInclude Include="src\System\ProcessUtils.h" />

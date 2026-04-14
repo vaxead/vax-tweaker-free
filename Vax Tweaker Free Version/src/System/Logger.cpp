@@ -7,6 +7,7 @@
 
 namespace Vax::System {
 
+    std::mutex Logger::s_mutex;
     std::vector<LogEntry> Logger::s_entries;
 
     void Logger::Info(const std::string& message) {
@@ -26,23 +27,25 @@ namespace Vax::System {
     }
 
     void Logger::Log(LogLevel level, const std::string& message) {
-        constexpr size_t kMaxEntries = 10000;
-        if (s_entries.size() >= kMaxEntries) {
-            s_entries.erase(s_entries.begin(), s_entries.begin() + (kMaxEntries / 10));
-        }
-
         LogEntry entry;
         entry.level = level;
         entry.message = message;
         entry.timestamp = GetTimestamp();
-        s_entries.push_back(entry);
+        std::lock_guard<std::mutex> lk(s_mutex);
+        constexpr size_t kMaxEntries = 10000;
+        if (s_entries.size() >= kMaxEntries) {
+            s_entries.erase(s_entries.begin(), s_entries.begin() + (kMaxEntries / 10));
+        }
+        s_entries.push_back(std::move(entry));
     }
 
-    const std::vector<LogEntry>& Logger::GetEntries() {
+    std::vector<LogEntry> Logger::GetEntries() {
+        std::lock_guard<std::mutex> lk(s_mutex);
         return s_entries;
     }
 
     std::vector<LogEntry> Logger::GetByLevel(LogLevel level) {
+        std::lock_guard<std::mutex> lk(s_mutex);
         std::vector<LogEntry> filtered;
         for (const auto& entry : s_entries) {
             if (entry.level == level) {
@@ -53,6 +56,7 @@ namespace Vax::System {
     }
 
     bool Logger::ExportToFile(const std::string& filePath) {
+        std::lock_guard<std::mutex> lk(s_mutex);
         std::ofstream file(filePath);
         if (!file.is_open()) {
             return false;
@@ -72,6 +76,7 @@ namespace Vax::System {
     }
 
     void Logger::Clear() {
+        std::lock_guard<std::mutex> lk(s_mutex);
         s_entries.clear();
     }
 

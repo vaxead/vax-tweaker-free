@@ -2,7 +2,6 @@
 #pragma once
 
 #include "../Core/Types.h"
-#include "../System/DriftDetector.h"
 #include <string>
 #include <vector>
 
@@ -61,9 +60,6 @@ public:
   static void DrawExitScreen();
 
   static void DrawDisclaimer();
-
-  static void
-  DrawDriftWarning(const std::vector<Vax::System::DriftEntry> &drifted);
 
   static void DrawTitleBox(const std::string &icon, const std::string &title,
                            const std::string &color);

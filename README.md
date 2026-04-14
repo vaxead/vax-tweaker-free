@@ -16,17 +16,19 @@ A lightweight Windows system tweaker for FPS optimization, network latency reduc
 
 ## Features
 
-### 🎮 FPS & Rendering (30+ tweaks)
+### 🎮 FPS & Rendering (40+ tweaks)
 - **Display & Compositor** — Fullscreen Optimizations, Multi-Plane Overlay, Transparency, DWM tuning, Visual Effects, Window Animations
 - **Game Bar & Overlays** — Game Bar/DVR, Snap Layouts, Aero Shake, Game Mode, Edge Swipe
 - **GPU & Scheduling** — Hardware-Accelerated GPU Scheduling, System DPI Awareness
 - **Input & Mouse** — Mouse Acceleration, Frame Pre-Render Queue, VRR Management, Menu Delay, Input Queue
-- **CPU & Power** — Power Throttling, Background Apps, Startup Delay, Kernel in RAM, Hung Tasks, PCIe ASPM, Fast Startup, Timer Distribution
+- **CPU & Power** — Power Throttling, Background Apps, Startup Delay, Kernel in RAM, Hung Tasks, PCIe ASPM, Fast Startup, Timer Distribution, Connected Standby
+- **Advanced Tuning** — CSRSS Priority, GPU Preemption, GPU Power Management, DWM Effect Mode, DXGI Flip Model, DWM Advanced, WHEA Error Recovery
 - **Services & Maintenance** — Disable Non-Microsoft Services
 
 ### 🌐 Network & Latency
-- **NIC Low Level** — Interrupt Moderation, Flow Control, Energy Efficient Ethernet, RSC, LSO
-- **TCP/IP Stack** — Nagle Algorithm, System TCP Optimizations
+- **NIC Low Level** — Interrupt Moderation, Flow Control, Energy Efficient Ethernet, RSC, LSO, Checksum Offload, ARP/NS Offload
+- **NIC Power & Advanced** — Wake on LAN, Priority VLAN Tag, NIC Power Saving
+- **TCP/IP Stack** — Nagle Algorithm, System TCP Optimizations, Disable TCP ECN, Remove QoS Bandwidth Limit
 - **Protocols & DNS** — NetBIOS, DNS presets (Cloudflare, Google, Quad9)
 - **Reset & Maintenance** — Winsock Reset, TCP/IP Reset, DNS Cache Flush
 
@@ -40,7 +42,6 @@ A lightweight Windows system tweaker for FPS optimization, network latency reduc
 ### Safety & Transparency
 - **System Restore Point** creation before applying tweaks
 - **Automatic registry backup** with crash recovery
-- **Drift Detection** — alerts when Windows or updates revert your tweaks
 - **Risk levels** on every tweak (Safe, Moderate, Advanced, Risky)
 - **Confirmation prompts** before every operation
 
@@ -48,15 +49,17 @@ A lightweight Windows system tweaker for FPS optimization, network latency reduc
 
 - Windows 10 / Windows 11 (x64)
 - Administrator privileges (required for registry and system modifications)
-- Visual Studio 2022+ with C++ Desktop workload (for building)
+- Visual Studio with the Desktop development with C++ workload
+- MSVC v145 build tools installed (matches the premium branch)
 
 ## Build
 
 1. Open `Vax Tweaker Free Version.slnx` in Visual Studio
-2. Select **Release | x64**
-3. Build the solution (`Ctrl+Shift+B`)
+2. If Visual Studio asks to retarget the project, install the MSVC v145 toolset or retarget locally before building
+3. Select **Release | x64**
+4. Build the solution (`Ctrl+Shift+B`)
 
-The executable will be in `x64/Release/`.
+The executable will be in `Vax Tweaker Free Version/x64/Release/`.
 
 ## Project Structure
 
@@ -65,7 +68,7 @@ src/
 ├── Core/            Application, Admin, SystemProfile, Compatibility, Types
 ├── Modules/         IModule, BaseModule, FpsModule, NetworkModule, CleanerModule
 ├── Safety/          SafetyGuard (confirmation flow)
-├── System/          Registry, Logger, DriftDetector, RestorePoint, PowerPlanManager, ProcessUtils
+├── System/          Registry, Logger, RestorePoint, PowerPlanManager, ProcessUtils
 └── UI/              Console, Renderer, Theme
 ```
 

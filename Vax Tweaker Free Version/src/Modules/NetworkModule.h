@@ -18,7 +18,7 @@ private:
   void InitializeTweaks();
 
   bool ApplyNicProperty(const std::string &property, const std::string &value);
-  bool RevertNicProperty(const std::string &property);
+  bool RevertNicProperty(const std::string &property, bool quiet = false);
   bool IsNicPropertySet(const std::string &property,
                         const std::string &expected);
   std::string FindActiveAdapterRegistryKey();
@@ -38,6 +38,10 @@ private:
   bool ApplyTcpSystemSettings();
   bool RevertTcpSystemSettings();
   bool IsTcpSystemOptimized();
+
+  bool ApplyTcpEcn();
+  bool RevertTcpEcn();
+  bool IsTcpEcnDisabled();
 
   bool ResetWinsock();
   bool ResetTcpIp();

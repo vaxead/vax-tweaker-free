@@ -1055,65 +1055,8 @@ void Renderer::DrawDisclaimer() {
   std::cout << Color::Dim << "]" << Color::Reset << ": " << Color::Bold;
 }
 
-void Renderer::DrawDriftWarning(
-    const std::vector<Vax::System::DriftEntry> &drifted) {
-  DrawLogo();
-  std::cout << "\n";
 
-  std::cout << Color::Dim;
-  PrintIndent();
-  std::cout << "┌──────────────────────────────────────────────────────────────"
-               "───┐\n";
 
-  PrintIndent();
-  std::cout << "│" << Color::Reset;
-  std::string header = std::string(Color::Yellow) + "  " + Icon::Warning +
-                       "  DRIFT DETECTED — TWEAKS REVERTED" +
-                       std::string(Color::Reset);
-  std::cout << PadRight(header, Layout::BoxWidth);
-  std::cout << Color::Dim << "│\n";
-
-  PrintIndent();
-  std::cout << "├────────────────────────────────────────────────────────────"
-               "─────┤\n"
-            << Color::Reset;
-
-  DrawBoxEmptyLine();
-  DrawBoxTextLine("   The following tweaks have been reverted since your",
-                  Color::White);
-  DrawBoxTextLine("   last session (e.g., by Windows Update or GP refresh):",
-                  Color::White);
-  DrawBoxEmptyLine();
-
-  std::string lastModule;
-  for (const auto &d : drifted) {
-    if (d.moduleName != lastModule) {
-      DrawBoxTextLine("   " + std::string(Color::Accent) + d.moduleName +
-                          std::string(Color::Reset),
-                      "");
-      lastModule = d.moduleName;
-    }
-    DrawBoxTextLine("     " + std::string(Color::Red) + Icon::Error + " " +
-                        std::string(Color::Gray) + d.tweakName +
-                        std::string(Color::Reset),
-                    "");
-  }
-
-  DrawBoxEmptyLine();
-  DrawBoxTextLine("   Re-apply these tweaks from their respective modules.",
-                  Color::Dim);
-  DrawBoxEmptyLine();
-
-  PrintIndent();
-  std::cout << Color::Dim
-            << "└────────────────────────────────────────────────────────────"
-               "─────┘\n"
-            << Color::Reset;
-
-  std::cout << "\n";
-  PrintIndent();
-  std::cout << Color::Dim << "Press any key to continue..." << Color::Reset;
-}
 
 void Renderer::DrawBoxEmptyLine() {
   PrintIndent();

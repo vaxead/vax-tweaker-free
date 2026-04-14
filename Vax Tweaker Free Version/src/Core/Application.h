@@ -1,10 +1,7 @@
 
 #pragma once
 
-#include "../System/DriftDetector.h"
 #include "Types.h"
-#include <atomic>
-#include <mutex>
 #include <vector>
 
 namespace Vax {
@@ -22,7 +19,6 @@ private:
   bool HandleAdminCheck();
   bool ShowDisclaimer();
   bool HandleRestorePoint();
-  void RunDriftCheck();
 
   void MainLoop();
   void HandleMenuChoice(int choice);
@@ -34,10 +30,6 @@ private:
   void ShowExitScreen();
 
   AppState m_state;
-
-  std::atomic<bool> m_driftCheckDone{false};
-  std::vector<System::DriftEntry> m_driftResults;
-  std::mutex m_driftMutex;
 };
 
 }

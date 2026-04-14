@@ -7,9 +7,9 @@
 
 namespace Vax {
 
-constexpr const char *APP_VERSION = "1.0.0-FREE";
+constexpr const char *APP_VERSION = "1.1.0-FREE";
 constexpr const char *APP_NAME = "VAX TWEAKER";
-constexpr const char *APP_TITLE = "VAX TWEAKER v1.0.0 - Free Edition";
+constexpr const char *APP_TITLE = "VAX TWEAKER v1.1.0 - Free Edition";
 
 enum class RiskLevel {
   Safe,

@@ -1,9 +1,10 @@
 
 #pragma once
 
+#include <chrono>
+#include <mutex>
 #include <string>
 #include <vector>
-#include <chrono>
 
 namespace Vax::System {
 
@@ -27,7 +28,7 @@ namespace Vax::System {
         static void Warning(const std::string& message);
         static void Error(const std::string& message);
 
-        static const std::vector<LogEntry>& GetEntries();
+        static std::vector<LogEntry> GetEntries();
 
         static std::vector<LogEntry> GetByLevel(LogLevel level);
 
@@ -40,6 +41,7 @@ namespace Vax::System {
         static std::string GetTimestamp();
         static std::string LevelToString(LogLevel level);
 
+        static std::mutex s_mutex;
         static std::vector<LogEntry> s_entries;
 
         Logger() = default;
